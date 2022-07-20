@@ -76,6 +76,7 @@ stella.+ 28042  0.1  2.2 177537468 3009412 pts/4 Sl+ 2019 283:03 tensorflow_mode
 
 docker inspect --format='{{.Id}} {{.Parent}}' $(docker images --filter since=d11de48c2d90 -q)
 
+du -h | sort -rh | head -5
 df -h | sort -r -k 5 -i
 du -h /var/ | sort -rh | head -5
 du -h /var/lib/docker/ | sort -rh | head -10
@@ -85,3 +86,28 @@ ps aux | sort -rk 3,3 | head -n 5
 ps aux | sort -k 3,3 | tail -n 5
 
 watch "ps aux | sort -nrk 3,3 | head -n 5"
+
+TF-SERVING
+
+docker run -itd --name tf-client-20191113 --gpus '"device=2"' -p 8181:8181 -v /home/aziz/:/home/ -v /raid/shared/aziz:/raid/ ubuntu:16.04
+docker run -itd --name tf-svr-histo-20200108 --gpus '"device=0,1"' -p 7510:7510 --port=8500 --rest_api_port=8501 -v /home/aziz/:/home/ -v /raid/shared/aziz:/raid/ --model_config_file=/models/models.conf tensorflow/serving:1.12.3-gpu
+
+docker run -p 8500:8500 -p 8501:8501 \
+  --mount type=bind,source=/path/to/my_model/,target=/models/my_model \
+  --mount type=bind,source=/path/to/my/models.config,target=/models/models.config \
+  -t tensorflow/serving --model_config_file=/models/models.config
+
+docker run -itd --name tf-server-20200108 -p 8502:8500 -p 8503:8501 --gpus '"device=0,1"' -v /home/aziz/:/home/ -v /raid/shared/aziz/models:/models/ tensorflow/serving:latest-gpu --mount type=bind,source=/raid/shared/aziz/models,target=/models/ --model_config_file=/models/models.conf 
+
+docker run -itd --name tf-svr-histo-20200108 -p 8502:8502 --gpus '"device=0,1"' -v /home/aziz/:/home/ -v /raid/shared/aziz/models:/models/ tensorflow/serving:latest-gpu
+docker run -itd --name tf-svr-histo-20200108 -p 7510:7510 -v /home/aziz/:/home/ -v /raid/shared/aziz:/raid/ --gpus '"device=0,1"' tensorflow/serving:1.12.3-gpu
+docker run -itd --name tf-svr-histo-20200108 -p 7510:7510 -v /raid/shared/aziz/models:/models/ --gpus '"device=0,1"' tensorflow/serving:1.12.3-gpu
+
+curl -d '{"instances": [1.0, 2.0, 5.0]}' -X POST http://localhost:8500/models/retina-resnet50:predict
+
+docker run -itd --name tf-client-20200101 --gpus '"device=2"' -p 8010:8010 -v /home/aziz/:/home/ -v /raid/shared/aziz:/raid/ ubuntu:16.04
+
+#docker run -itd --name tf-svr-retina-20210201 -p 8500:8500 -v /home/abdaziz.latip/:/home/ -v /home/abdaziz.latip/mip/models/retina:/models/ tensorflow/serving:1.12.3 --rest_api_port=8502 --model_config_file=/models/models.conf --enable_model_warmup=false
+#docker run -itd --name tf-svr-histo-20200108 -p 8502:8500 -v /home/abdaziz.latip/:/home/ -v /home/abdaziz.latip/mip/models/histopathology:/models/ tensorflow/serving:2.0.0 --rest_api_port=8503 --model_config_file=/models/models.conf --enable_model_warmup=false
+#docker run -itd --name tf-2.6 -p 2026:8888 tensorflow/tensorflow:2.6.0-gpu-jupyter
+#docker run -itd --name tf-2.6-gpu --gpus all -p 2036:8888 tensorflow/tensorflow:2.6.0-gpu-jupyter
